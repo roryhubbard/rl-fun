@@ -1,0 +1,3 @@
+[submodule "thirdparty/gym"]
+	path = thirdparty/gym
+	url = https://github.com/openai/gym.git
