@@ -1,6 +1,9 @@
 import numpy as np
 
 
+SEED = 0
+
+
 def initialize_policy(n_actions, n_states, random=False):
     if random:
         policy = np.random.default_rng(SEED).dirichlet(
@@ -8,8 +11,6 @@ def initialize_policy(n_actions, n_states, random=False):
     else:
         # all actions are of equal probability
         policy = np.ones((n_states, n_actions)) / n_actions
-
-    assert policy[0].sum() == 1.0
     return policy
 
 
