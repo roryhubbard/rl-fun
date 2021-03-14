@@ -1,3 +1,6 @@
 [submodule "thirdparty/gym"]
 	path = thirdparty/gym
 	url = https://github.com/openai/gym.git
+[submodule "thirdparty/reinforcement-learning"]
+	path = thirdparty/reinforcement-learning
+	url = https://github.com/dennybritz/reinforcement-learning.git
