@@ -12,7 +12,7 @@ SEED = 0
 def mc_control_epsilon_greedy(env, num_episodes,
                               discount_rate=1.0, epsilon=0.2):
     """
-    First visit monte carlo policy evaluation
+    First visit monte carlo epsilon greedy control
     input:
     - env: environment
     - num_episodes: # of episodes to run
