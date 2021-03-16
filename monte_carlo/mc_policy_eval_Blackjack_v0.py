@@ -40,7 +40,7 @@ def get_disounted_reward(rewards, discount_rate):
     return discounted_reward
 
 
-def mc_policy_eval(policy, env, num_episodes=10000, discount_rate=1.0):
+def mc_policy_eval(policy, env, num_episodes, discount_rate=1.0):
     """
     First visit monte carlo policy evaluation
     input:
