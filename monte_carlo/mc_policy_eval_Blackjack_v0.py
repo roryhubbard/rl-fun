@@ -1,43 +1,11 @@
 import gym
 import numpy as np
 from collections import defaultdict
+from utils import sample_policy, get_episode, get_disounted_reward
 from plotting import plot_value_function
 
 
 SEED = 0
-
-
-def sample_policy(observation):
-    """
-    A policy that sticks if the player score is >= 20 and hits otherwise.
-    """
-    score, dealer_score, usable_ace = observation
-    return 0 if score >= 20 else 1
-
-
-def get_episode(policy, env):
-    """
-    episode = [S0, A0, R1, S1, A1, R2, ...]
-    """
-    observation = env.reset()
-    episode = []
-    done = False
-    while not done:
-        action = policy(observation)
-        next_observation, reward, done, _ = env.step(action)
-        episode.append((observation, action, reward))
-        observation = next_observation
-    return episode
-
-
-def get_disounted_reward(rewards, discount_rate):
-    """
-    G(t) = R(t+1) + R(t+2) * gamma + ... + R(T) * gamma**(T-1)
-    """
-    discounted_reward = 0
-    for i, r in enumerate(rewards):
-        discounted_reward += r * discount_rate**i
-    return discounted_reward
 
 
 def mc_policy_eval(policy, env, num_episodes, discount_rate=1.0):
@@ -53,9 +21,11 @@ def mc_policy_eval(policy, env, num_episodes, discount_rate=1.0):
     """
     state_counter = defaultdict(int)
     V = defaultdict(float)
+
     for t in range(num_episodes):
         episode = get_episode(policy, env)
         visited_states = set()
+
         for i, (state, _action, _reward) in enumerate(episode):
             # only allow first visit to contribute to state value
             if state not in visited_states:
@@ -63,8 +33,10 @@ def mc_policy_eval(policy, env, num_episodes, discount_rate=1.0):
                 state_counter[state] += 1
                 G = get_disounted_reward(
                     list(map(lambda x: x[2], episode[i:])), discount_rate)
+
                 # incremental mean
                 V[state] += (G - V[state]) / state_counter[state]
+
     return V
 
 
