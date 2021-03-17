@@ -36,9 +36,30 @@ def get_episode_epsilon_greedy(Q, env, epsilon):
 
     while not done:
         if random.uniform(0.0, 1.0) < epsilon:
-            action = random.choice((0, 1))
+            action = random.choice(tuple(range(env.action_space.n)))
         else:
             action = get_greedy_action(Q, observation)
+
+        next_observation, reward, done, _ = env.step(action)
+        episode.append((observation, action, reward))
+        observation = next_observation
+
+    return episode
+
+
+def get_episode_epsilon_greedy_from_policy(policy, env, epsilon):
+    """
+    episode = [S0, A0, R1, S1, A1, R2, ...]
+    """
+    observation = env.reset()
+    episode = []
+    done = False
+
+    while not done:
+        if random.uniform(0.0, 1.0) < epsilon:
+            action = random.choice(tuple(range(env.action_space.n)))
+        else:
+            action = policy(observation)
 
         next_observation, reward, done, _ = env.step(action)
         episode.append((observation, action, reward))
