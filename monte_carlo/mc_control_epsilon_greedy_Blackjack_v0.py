@@ -22,7 +22,7 @@ def mc_control_epsilon_greedy(env, num_episodes,
     - policy: epsilon greedy optimal policy
     - Q: state-action value function
     """
-    state_counter = defaultdict(lambda: [0, 0])
+    state_counter = defaultdict(lambda: np.zeros(env.action_space.n))
     Q = defaultdict(lambda: np.zeros(env.action_space.n))
     policy = defaultdict(int)
 
