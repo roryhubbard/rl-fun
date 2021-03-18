@@ -2,14 +2,14 @@ import gym
 import numpy as np
 from collections import defaultdict
 from utils import get_disounted_reward, \
-    get_episode_epsilon_greedy_from_policy, get_greedy_action, sample_policy
+    get_episode_epsilon_greedy, get_greedy_action, get_random_policy
 from plotting import plot_value_function
 
 
 SEED = 0
 
 
-def mc_control_importanc_sampling(env, num_episodes,
+def mc_control_importance_sampling(env, num_episodes,
                               discount_rate=1.0, epsilon=0.2):
     """
     Importance sampling, off-policy monte carlo control
@@ -19,39 +19,51 @@ def mc_control_importanc_sampling(env, num_episodes,
     - discount_rate: gamma
     - epsilon: probability of "exploring" or choosing a random action
     output:
-    - policy: epsilon greedy optimal policy
+    - target_policy: epsilon greedy optimal policy
     - Q: state-action value function
     """
-    b = sample_policy
+    b = get_random_policy(env)
     Q = defaultdict(lambda: np.zeros(env.action_space.n))
     C = defaultdict(lambda: np.zeros(env.action_space.n))
-    policy = defaultdict(int)
+    target_policy = defaultdict(int)  # deterministic
 
     for t in range(num_episodes):
-        episode = get_episode_epsilon_greedy_from_policy(b, env, epsilon)
+        # generate episode with behavior policy (b)
+        episode = get_episode_epsilon_greedy(b, env, epsilon)
         W = 1
 
-        for i, (state, action, _reward) in enumerate(episode):
+        # loop backwards through episode
+        for i, (state, action, _reward) in enumerate(list(reversed(episode))):
             G = get_disounted_reward(
                 list(map(lambda x: x[2], episode[i:])), discount_rate)
+
+            # add to running some of importance-sampling ratios
+            # for this state-action pair
             C[state][action] += W
 
-            Q[state][action] += W / C * (G - Q[state][action])
-            policy[state] = get_greedy_action(Q, state)
+            # update state-action value
+            Q[state][action] += W / C[state][action] * (G - Q[state][action])
+            # update target policy with updated Q value
+            target_policy[state] = get_greedy_action(Q, state)
 
-            if action != policy[state]:
+            # if the action taken by the behavior policy is not the same as
+            # what the target policy would take, the importance-sampling
+            # ration becomes 0 because target policy is deterministic, so break
+            if action != target_policy[state].argmax():
                 break
 
-            W /= _____________________
+            # update importance sampling ratio, numerator is 1 because target
+            # policy is deterministic
+            W /= b[state][action]
 
-    return policy, Q
+    return target_policy, Q
 
 
 def main():
     env = gym.make('Blackjack-v0')
     env.seed(SEED)
 
-    policy, Q = mc_control_epsilon_greedy(env, 500000)
+    policy, Q = mc_control_importance_sampling(env, 500000)
 
     # For plotting: Create value function from action-value function
     # by picking the best action at each state
