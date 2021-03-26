@@ -22,7 +22,7 @@ plt.rcParams["figure.autolayout"] = True
 SEED = 0
 
 
-def q_learning(env, num_episodes, discount_rate=0.9, alpha=0.5, epsilon=0.1):
+def q_learning(env, num_episodes, discount_rate=0.9, alpha=0.2, epsilon=0.1):
     """
     Estimate optimal state-value function Q using Q-Learning
 
