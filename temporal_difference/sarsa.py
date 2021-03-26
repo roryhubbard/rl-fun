@@ -64,7 +64,7 @@ def sarsa(env, num_episodes, discount_rate=1.0, alpha=0.5, epsilon=0.1):
 
         stats['episode_total_rewards'].append(reward_sum)
         stats['episode_total_steps'].append(step_counter)
-     
+
     return Q, stats
 
 
