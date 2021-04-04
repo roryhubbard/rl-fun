@@ -47,7 +47,7 @@ class Tiles:
         high = self.state_bounds[1]
         tile_dim = (high - low) / self.tiling_dim
         offset_unit_length = tile_dim / self.ntilings
-        displacement = np.array(range(1, 2*self.ndim, 2))  # first odd integers
+        displacement = np.arange(1, 2*self.ndim, 2)  # first odd integers
         offset = np.outer(np.arange(self.ntilings),
                           displacement * offset_unit_length)
         self.tiling_bounds = offset[:, np.newaxis, :] + self.state_bounds
