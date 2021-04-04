@@ -30,18 +30,16 @@ class Tiles:
         self.tiling_dim = np.array(tiling_dim)
         self.ntilings = ntilings
 
-        self.tiling_bounds = None
-        self.make_offset_tilings()
+        self.tiling_bounds = self.get_tiling_bounds()
 
         self.w = np.zeros(ntilings * self.tiling_dim.prod())  # weights to learn
 
 
-    def make_offset_tilings(self):
+    def get_tiling_bounds(self):
         """
-        Set the tile locations within the continuous state space for eaching
-        tiling with asymmetric offsets by using a displacement vector according
-        to the first odd integers (1,3,5,7,...,2k-1) where k is the state space
-        dimension.
+        Get tiling bounds for each tiling with asymmetric offsets by using a
+        displacement vector according to the first odd integers
+        (1,3,5,7,...,2k-1) where k is the state space rank.
         """
         low = self.state_bounds[0]
         high = self.state_bounds[1]
@@ -50,7 +48,7 @@ class Tiles:
         displacement = np.arange(1, 2*self.ndim, 2)  # first odd integers
         offset = np.outer(np.arange(self.ntilings),
                           displacement * offset_unit_length)
-        self.tiling_bounds = offset[:, np.newaxis, :] + self.state_bounds
+        return offset[:, np.newaxis, :] + self.state_bounds
 
 
     def approximate(self, state):
