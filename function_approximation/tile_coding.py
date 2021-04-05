@@ -11,7 +11,7 @@ class Tiles:
     as described in Sutton's book.
     """
 
-    def __init__(self, low, high, tiling_dim, ntilings):
+    def __init__(self, low, high, tiling_dim, ntilings, nactions=1):
         assert len(low) == len(high) == len(tiling_dim), (
             'dimension for low and high state and tiling specification need '
             'to match')
@@ -25,10 +25,12 @@ class Tiles:
         self.state_bounds = np.stack((low, high), axis=0)
         self.tiling_dim = np.array(tiling_dim)
         self.ntilings = ntilings
+        self.nactions = nactions
 
         self.tiling_bounds = self.get_tiling_bounds()
 
-        self.w = np.zeros(ntilings * self.tiling_dim.prod())  # weights to learn
+        # weights to learn
+        self.w = np.zeros(nactions * ntilings * self.tiling_dim.prod())
 
     def get_tiling_bounds(self):
         """
@@ -45,7 +47,7 @@ class Tiles:
                           displacement * offset_unit_length)
         return offset[:, np.newaxis, :] + self.state_bounds
 
-    def approximate(self, state):
+    def evaluate(self, state, action):
         """
         Flip all tiles that the state is within to 1 and return function
         approximation.
@@ -53,11 +55,11 @@ class Tiles:
         Approximation v(s) is a linear combination of features x(s)
         - v(s) = x(s).T * w
         """
-        x = np.zeros((self.ntilings, *self.tiling_dim))
+        x = np.zeros((self.nactions, self.ntilings, *self.tiling_dim))
         for tiling_n, tiling_bound in enumerate(self.tiling_bounds):
-            tile_idx = get_tile_index(state, tiling_bound)
+            tile_idx = self.get_tile_index(state, tiling_bound)
             if tile_idx is not None:
-                x[tiling_n][tile_idx] = 1
+                x[action][tiling_n][tile_idx] = 1
         return x.flatten()[np.newaxis, :] @ self.w
 
     def get_tile_index(self, state, tiling_bound):
