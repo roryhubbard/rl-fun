@@ -74,15 +74,9 @@ class Tiles:
 
         low = tiling_bound[0]
         high = tiling_bound[1]
-        coordinates = []
-
-        for d, s in enumerate(state):
-            s_normalized = s - low[d]
-            discretization_length = (high[d] - low[d]) / self.tiling_dim[d]
-            coord = int(s_normalized / discretization_length)  # floored
-            coordinates.append(coord)
-
-        return coordinates
+        s_normalized = state - low
+        discretization_length = (high - low) / self.tiling_dim
+        return np.floor(s_normalized / discretization_length).astype(int)
 
 
     def tiling_contains_state(self, state, tiling_bound):
@@ -108,7 +102,7 @@ def main():
     tiles = Tiles(env.low, env.high, (8, 8), 8)
 
     # tiles = Tiles([0, 0], [4, 8], (4, 4), 8)
-    # tiles.get_tile_index([.5, 2.5], tiles.tiling_bounds[0])
+    # tiles.get_tile_index([1.5, 4.5], tiles.tiling_bounds[0])
 
     # for i in range(200):
     #     env.render()
