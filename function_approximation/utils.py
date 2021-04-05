@@ -25,7 +25,7 @@ def get_epsilon_greedy_action(env, Q, observation, epsilon):
         else get_greedy_action(Q, observation)
 
 
-def watch_greedy_policy(env, Q, max_num_steps=50):
+def watch_greedy_policy(env, Q):
     """
     Render environment while taking greedy actions according to Q
     """
@@ -33,13 +33,7 @@ def watch_greedy_policy(env, Q, max_num_steps=50):
     env.render()
     done = False
 
-    step_counter = 0
     while not done:
         action = get_greedy_action(Q, state)
         state, _, done, _ = env.step(action)
         env.render()
-
-        step_counter += 1
-        if step_counter > max_num_steps:
-            print(f'failed to reach goal within {max_num_steps} steps')
-            break

@@ -1,5 +1,5 @@
 import gym
-from utils import get_epsilon_greedy_action
+from utils import get_epsilon_greedy_action, watch_greedy_policy
 from tile_coding import Tiles
 from plotting import plot_cost_to_go_mountain_car
 
@@ -70,9 +70,11 @@ def main():
 
     tiles = Tiles(env.low, env.high, (8, 8), 8, env.action_space.n)
 
-    q = episodic_semi_gradient_n_step_sarsa(env, tiles, 0.9, 0.1/8, 0.2, 1000)
+    Q = episodic_semi_gradient_n_step_sarsa(env, tiles, 0.9, 0.1/8, 0.2, 1000)
 
-    plot_cost_to_go_mountain_car(env, q)
+    plot_cost_to_go_mountain_car(env, Q)
+
+    watch_greedy_policy(env, Q)
 
     env.close()
 
