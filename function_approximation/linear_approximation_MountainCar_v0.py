@@ -26,7 +26,7 @@ def episodic_semi_gradient_n_step_sarsa(env, Q, discount_rate,
     """
     stats = dict(episode_total_rewards=[], episode_total_steps=[])
 
-    for _episode in range(nepisodes):
+    for episode in range(nepisodes):
         state = env.reset()
         action = get_epsilon_greedy_action(env, Q, state, epsilon)
         done = False
@@ -56,6 +56,9 @@ def episodic_semi_gradient_n_step_sarsa(env, Q, discount_rate,
         stats['episode_total_rewards'].append(reward_sum)
         stats['episode_total_steps'].append(step_counter)
 
+        if episode % 50 == 0:
+            print(f'episode: {episode} / {nepisodes}')
+
     return Q
 
 
@@ -67,7 +70,7 @@ def main():
 
     tiles = Tiles(env.low, env.high, (8, 8), 8, env.action_space.n)
 
-    q = episodic_semi_gradient_n_step_sarsa(env, tiles, 0.9, 0.1/8, 0.2, 10000)
+    q = episodic_semi_gradient_n_step_sarsa(env, tiles, 0.9, 0.1/8, 0.2, 1000)
 
     plot_cost_to_go_mountain_car(env, q)
 
