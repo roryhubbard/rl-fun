@@ -14,7 +14,7 @@ class Tiles:
     def __init__(self, low, high, tiling_dim, ntilings):
         assert len(low) == len(high) == len(tiling_dim), (
             'dimension for low and high state and tiling specification need '
-             'to match')
+            'to match')
 
         self.ndim = len(low)  # dimensions in state space
 
@@ -29,7 +29,6 @@ class Tiles:
         self.tiling_bounds = self.get_tiling_bounds()
 
         self.w = np.zeros(ntilings * self.tiling_dim.prod())  # weights to learn
-
 
     def get_tiling_bounds(self):
         """
@@ -46,7 +45,6 @@ class Tiles:
                           displacement * offset_unit_length)
         return offset[:, np.newaxis, :] + self.state_bounds
 
-
     def approximate(self, state):
         """
         Flip all tiles that the state is within to 1 and return function
@@ -60,20 +58,16 @@ class Tiles:
             tile_idx = get_tile_index(state, tiling_bound)
             if tile_idx is not None:
                 x[tiling_n][tile_idx] = 1
-
         return x.flatten()[np.newaxis, :] @ self.w
-
 
     def get_tile_index(self, state, tiling_bound):
         if not self.tiling_contains_state(state, tiling_bound):
             return None
-
         low = tiling_bound[0]
         high = tiling_bound[1]
         s_normalized = state - low
         discretization_length = (high - low) / self.tiling_dim
         return np.floor(s_normalized / discretization_length).astype(int)
-
 
     def tiling_contains_state(self, state, tiling_bound):
         if isinstance(state, list):
