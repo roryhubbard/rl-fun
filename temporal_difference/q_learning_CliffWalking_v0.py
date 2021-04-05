@@ -14,9 +14,9 @@ plt.rcParams['axes.labelcolor'] = 'white'
 plt.rcParams['axes.titlecolor'] = 'white'
 plt.rcParams['xtick.color'] = 'white'
 plt.rcParams['ytick.color'] = 'white'
-# plt.rcParams['legend.facecolor'] = 'white'
 plt.rcParams['text.color'] = 'white'
 plt.rcParams["figure.autolayout"] = True
+# plt.rcParams['legend.facecolor'] = 'white'
 
 
 SEED = 0
