@@ -115,7 +115,7 @@ class Tiles:
         s_normalized = state - low
         discretization_length = (high - low) / self.tiling_dim
         return tuple(np.floor(s_normalized / discretization_length).astype(int) \
-            .clip([0, 0], self.tiling_dim-1))
+            .clip(np.zeros_like(self.tiling_dim), self.tiling_dim-1))
 
     def tiling_contains_state(self, state, tiling_bound):
         """
