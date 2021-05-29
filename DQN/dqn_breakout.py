@@ -3,11 +3,25 @@ import gym
 from collections import deque
 from q_network import QNetwork
 
+import time
+import cv2
+import numpy as np
+
 
 SEED = 0
 
 
-def deep_qlearning(env, Q, nepisodes):
+def preprocess_image(img):
+    """
+    210 x 160 x 3 -> 80 x 80
+    """
+    grayscale = img @ [0.2989, 0.5870, 0.1140]
+    cropped = grayscale[35:195]
+    downsampled = cropped[::2,::2]
+    return downsampled
+
+
+def deep_qlearning(env, nepisodes):
     """
     Input:
     - env: environment
@@ -25,9 +39,10 @@ def deep_qlearning(env, Q, nepisodes):
 
     N = 10  # replay buffer size
     D = deque(maxlen=N)  # replay buffer
-    transitions = []
 
     C = 10  # number of iterations before resetting Q_target
+    m = 4  # number of consecutive images to stack for input to Q network
+    k = 4  # number of frames to skip before new action is selected
 
     for episode in range(nepisodes):
         state = env.reset()
@@ -35,9 +50,11 @@ def deep_qlearning(env, Q, nepisodes):
 
         i = 0
         while not done:
-            action = Q.get_epsilon_greedy_action(state, epsilon)
+            # action = Q.get_epsilon_greedy_action(state, epsilon)
+            action = env.action_space.sample()
             next_state, reward, done, _ = env.step(action)
-            transitions.append((state, action, reward, next_state, done))
+
+            D.append((state, action, reward, next_state, done))
 
             mini_batch = []
             for transition in mini_batch:
@@ -49,9 +66,17 @@ def deep_qlearning(env, Q, nepisodes):
                 loss = (y - Q.get_greedy_action(state))**2
                 Q.gradient_descent_step(loss)
 
-            i += 1
-            if i % C == 0:
-                Q_target = Q.clone()
+            # i += 1
+            # if i % C == 0:
+            #     Q_target = Q.clone()
+
+
+            # env.render()
+            # cv2.imshow('', preprocess_image(next_state))
+            # cv2.waitKey(1)
+            # time.sleep(.05)
+
+        break
 
 
 def main():
