@@ -1,21 +1,28 @@
 import random
-import gym
 from collections import deque
+import gym
+import numpy as np
 from q_network import QNetwork
 
 import time
 import cv2
-import numpy as np
 
 
-SEED = 0
+"""
+In these experiments, we used the RMSProp (see http://www.cs.toronto.edu/
+,tijmen/csc321/slides/lecture_slides_lec6.pdf ) algorithm with minibatches of size
+32. The behaviour policy during training was e-greedy with e annealed linearly
+from 1.0 to 0.1 over the first million frames, and fixed at 0.1 thereafter. We trained
+for a total of 50 million frames (that is, around 38 days of game experience in total)
+and used a replay memory of 1 million most recent frames.
+"""
 
 
-def preprocess_image(img):
+def preprocess_frame(frame):
     """
     210 x 160 x 3 -> 80 x 80
     """
-    grayscale = img @ [0.2989, 0.5870, 0.1140]
+    grayscale = frame @ [0.2989, 0.5870, 0.1140]
     cropped = grayscale[35:195]
     downsampled = cropped[::2,::2]
     return downsampled
@@ -37,26 +44,40 @@ def deep_qlearning(env, nepisodes):
     Q_target = QNetwork()
     Q = QNetwork()
 
-    N = 10  # replay buffer size
-    D = deque(maxlen=N)  # replay buffer
+    N = 1000000  # replay memory size
+    D = deque(maxlen=N)  # replay memory
 
     C = 10  # number of iterations before resetting Q_target
-    m = 4  # number of consecutive images to stack for input to Q network
-    k = 4  # number of frames to skip before new action is selected
+    m = 4  # number of consecutive frames to stack for input to Q network
+    frame_sequence = deque(maxlen=m)
 
     for episode in range(nepisodes):
-        state = env.reset()
+        frame_sequence.append(preprocess_frame(env.reset()))  # s in paper
+        frame_arr = None  # phi in paper
         done = False
 
         i = 0
         while not done:
             # action = Q.get_epsilon_greedy_action(state, epsilon)
             action = env.action_space.sample()
-            next_state, reward, done, _ = env.step(action)
+            frame, reward, done, _ = env.step(action)
+            frame_sequence.append(preprocess_frame(frame))
 
-            D.append((state, action, reward, next_state, done))
+            if len(frame_sequence) < m:
+                continue
 
-            mini_batch = []
+            if frame_arr is None:
+                frame_arr = np.stack(frame_sequence)
+                continue
+
+            next_frame_arr = np.stack(frame_sequence)
+            D.append((frame_arr, action, reward, next_frame_arr, done))
+            frame_arr = next_frame_arr
+
+            if len(D) < N:
+                continue
+
+            mini_batch = []  # size 32
             for transition in mini_batch:
                 state, action, reward, next_state, done = transition
                 y = reward if done \
@@ -72,7 +93,7 @@ def deep_qlearning(env, nepisodes):
 
 
             # env.render()
-            # cv2.imshow('', preprocess_image(next_state))
+            # cv2.imshow('', preprocess_frame(next_state))
             # cv2.waitKey(1)
             # time.sleep(.05)
 
@@ -80,9 +101,9 @@ def deep_qlearning(env, nepisodes):
 
 
 def main():
-    env = gym.make('Breakout-v0')
-    env.seed(SEED)
-    env.reset()
+    # Note: setting frameskip to an int makes the game deterministic
+    k = 4  # number of frames to skip before new action is selected
+    env = gym.make('Breakout-v0', frameskip=4)
 
     nepisodes = 100
     Q = deep_qlearning(env, nepisodes)
