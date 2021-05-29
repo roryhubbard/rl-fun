@@ -71,6 +71,7 @@ def deep_qlearning(env, nepisodes):
                 continue
 
             next_frame_arr = np.stack(frame_sequence)
+            # store transition in replay memory
             D.append((frame_arr, action, reward, next_frame_arr, done))
             frame_arr = next_frame_arr
 
@@ -79,12 +80,12 @@ def deep_qlearning(env, nepisodes):
 
             mini_batch = []  # size 32
             for transition in mini_batch:
-                state, action, reward, next_state, done = transition
-                y = reward if done \
+                frame_arr, action, reward, next_frame_arr, done = transition
+                target = reward if done \
                     else reward + discount_rate \
                     * Q_target.get_greedy_action(next_state)
 
-                loss = (y - Q.get_greedy_action(state))**2
+                loss = (target - Q.get_greedy_action(state))**2
                 Q.gradient_descent_step(loss)
 
             # i += 1
