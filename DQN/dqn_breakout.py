@@ -1,5 +1,6 @@
 import random
 from collections import deque
+from copy import deepcopy
 import gym
 import numpy as np
 from q_network import QNetwork
@@ -28,18 +29,20 @@ def preprocess_frame(frame):
     return downsampled
 
 
-def deep_qlearning(env, nepisodes):
+def deep_qlearning(env, nframes):
     """
     Input:
     - env: environment
-    - nepisodes: # of episodes to run
+    - nframes: # of frames to train on
 
     Output:
     - Q: trained Q-network
     """
-    discount_rate = 0.99
+    discount_factor = 0.99
     lr = 0.1
-    epsilon = 0.1
+
+    initial_exploration = 1.
+    final_exploration = 0.1
 
     Q_target = QNetwork()
     Q = QNetwork()
@@ -47,17 +50,26 @@ def deep_qlearning(env, nepisodes):
     N = 1000000  # replay memory size
     D = deque(maxlen=N)  # replay memory
 
-    C = 10  # number of iterations before resetting Q_target
+    C = 10000  # number of iterations before resetting Q_target
+    last_Q_target_update = 0
     m = 4  # number of consecutive frames to stack for input to Q network
+    mini_batch_size = 32
     frame_sequence = deque(maxlen=m)
 
-    for episode in range(nepisodes):
-        frame_sequence.append(preprocess_frame(env.reset()))  # s in paper
-        frame_arr = None  # phi in paper
+    trained_frames_count = 0
+
+    sgd_update_frequency = 4
+    replay_start_size = 50000
+
+    last_sgd_update = 0
+
+    while True:
+        frame_sequence.append(preprocess_frame(env.reset()))  # 's' in paper
+        frame_arr = None  # 'phi' in paper
         done = False
 
-        i = 0
         while not done:
+            # epsilon = some function of initial_exploration and final_exploration
             # action = Q.get_epsilon_greedy_action(state, epsilon)
             action = env.action_space.sample()
             frame, reward, done, _ = env.step(action)
@@ -75,28 +87,37 @@ def deep_qlearning(env, nepisodes):
             D.append((frame_arr, action, reward, next_frame_arr, done))
             frame_arr = next_frame_arr
 
-            if len(D) < N:
+            if len(D) < replay_start_size:
                 continue
 
-            mini_batch = []  # size 32
-            for transition in mini_batch:
+            last_sgd_update += 1
+
+            if last_sgd_update < sgd_update_frequency:
+                continue
+
+            last_sgd_update = 0
+
+            rng = np.random.default_rng()
+            mini_batch_idx = rng.choice(len(D), mini_batch_size)
+
+            for idx in mini_batch_idx:
+                transition = D[idx]
                 frame_arr, action, reward, next_frame_arr, done = transition
                 target = reward if done \
-                    else reward + discount_rate \
-                    * Q_target.get_greedy_action(next_state)
+                    else reward + discount_factor \
+                    * Q_target.get_greedy_action(next_frame_arr)
 
-                loss = (target - Q.get_greedy_action(state))**2
+                loss = (target - Q.get_greedy_action(frame_arr))**2
                 Q.gradient_descent_step(loss)
 
-            # i += 1
-            # if i % C == 0:
-            #     Q_target = Q.clone()
+                last_Q_target_update += 1
+                trained_frames_count += 1
 
+                if last_Q_target_update % C == 0:
+                    Q_target = deepcopy(Q)
 
-            # env.render()
-            # cv2.imshow('', preprocess_frame(next_state))
-            # cv2.waitKey(1)
-            # time.sleep(.05)
+                if trained_frames_count == nframes:
+                    return
 
 
 def main():
@@ -104,8 +125,8 @@ def main():
     k = 4  # number of frames to skip before new action is selected
     env = gym.make('Breakout-v0', frameskip=4)
 
-    nepisodes = 100
-    Q = deep_qlearning(env, nepisodes)
+    nframes = 50000000  # train for a total of 50 million frames
+    Q = deep_qlearning(env, nframes)
 
     # print(env.action_space.n)
     # print(env.observation_space.shape)
