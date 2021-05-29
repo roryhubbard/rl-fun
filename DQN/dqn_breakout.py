@@ -98,8 +98,6 @@ def deep_qlearning(env, nepisodes):
             # cv2.waitKey(1)
             # time.sleep(.05)
 
-        break
-
 
 def main():
     # Note: setting frameskip to an int makes the game deterministic
