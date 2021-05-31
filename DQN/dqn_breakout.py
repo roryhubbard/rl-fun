@@ -3,121 +3,116 @@ from collections import deque
 from copy import deepcopy
 import gym
 import numpy as np
+import torch
+import torch.optim as optim
 from q_network import QNetwork
-
-import time
-import cv2
-
-
-"""
-In these experiments, we used the RMSProp (see http://www.cs.toronto.edu/
-,tijmen/csc321/slides/lecture_slides_lec6.pdf ) algorithm with minibatches of size
-32. The behaviour policy during training was e-greedy with e annealed linearly
-from 1.0 to 0.1 over the first million frames, and fixed at 0.1 thereafter. We trained
-for a total of 50 million frames (that is, around 38 days of game experience in total)
-and used a replay memory of 1 million most recent frames.
-"""
+from utils import preprocess_frame, initialize_frame_sequence, \
+    annealed_epsilon, get_epsilon_greedy_action, get_greedy_action
 
 
-def preprocess_frame(frame):
-    """
-    210 x 160 x 3 -> 80 x 80
-    """
-    grayscale = frame @ [0.2989, 0.5870, 0.1140]
-    cropped = grayscale[35:195]
-    downsampled = cropped[::2,::2]
-    return downsampled
+# ref: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
 
 
-def deep_qlearning(env, nframes):
+def deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
+                   replay_start_size, sgd_update_frequency):
     """
     Input:
     - env: environment
     - nframes: # of frames to train on
+    - discount_factor (gamma): how much to discount future rewards
+    - N: replay memory size
+    - C: number of steps before updating Q target network
+    - mini_batch_size: mini batch size
+    - replay_start_size: minimum size of replay memory before learning starts
+    - sgd_update_frequency: number of action selections in between consecutive
+      mini batch SGD updates
 
     Output:
     - Q: trained Q-network
     """
-    discount_factor = 0.99
-    lr = 0.1
-
     initial_exploration = 1.
     final_exploration = 0.1
+    # number of frames over which the epsilon is annealed to its final value
+    final_exploration_frame = 1000000
 
-    Q_target = QNetwork()
-    Q = QNetwork()
+    n_actions = env.action_space.n
+    Q = QNetwork(n_actions).type(torch.FloatTensor)
+    Q_target = deepcopy(Q)
 
-    N = 1000000  # replay memory size
+    lr = 0.00025
+    momentum = 0.95
+    optimizer = optim.RMSprop(Q.parameters(), lr=lr, momentum=momentum)
+
     D = deque(maxlen=N)  # replay memory
 
-    C = 10000  # number of iterations before resetting Q_target
     last_Q_target_update = 0
+
     m = 4  # number of consecutive frames to stack for input to Q network
-    mini_batch_size = 32
-    frame_sequence = deque(maxlen=m)
 
     trained_frames_count = 0
 
-    sgd_update_frequency = 4
-    replay_start_size = 50000
-
     last_sgd_update = 0
 
+    epsilon = .1
     while True:
-        frame_sequence.append(preprocess_frame(env.reset()))  # 's' in paper
-        frame_arr = None  # 'phi' in paper
+        frame_sequence = initialize_frame_sequence(env, Q, m, epsilon)
+        state = torch.as_tensor(np.stack(frame_sequence))
         done = False
 
         while not done:
-            # epsilon = some function of initial_exploration and final_exploration
-            # action = Q.get_epsilon_greedy_action(state, epsilon)
-            action = env.action_space.sample()
-            frame, reward, done, _ = env.step(action)
-            frame_sequence.append(preprocess_frame(frame))
+            epsilon = annealed_epsilon(
+                initial_exploration, final_exploration,
+                final_exploration_frame, trained_frames_count)
+            action = get_epsilon_greedy_action(Q, state, epsilon, n_actions)
+            # action = env.action_space.sample()
+            frame, reward, done, _ = env.step(action.item())
 
-            if len(frame_sequence) < m:
-                continue
+            reward = torch.tensor([reward])
 
-            if frame_arr is None:
-                frame_arr = np.stack(frame_sequence)
-                continue
+            if done:
+                next_state = None
+            else:
+                frame_sequence.append(preprocess_frame(frame))
+                next_state = torch.as_tensor(np.stack(frame_sequence))
 
-            next_frame_arr = np.stack(frame_sequence)
             # store transition in replay memory
-            D.append((frame_arr, action, reward, next_frame_arr, done))
-            frame_arr = next_frame_arr
+            D.append((state, action, reward, next_state))
+
+            state = next_state
 
             if len(D) < replay_start_size:
                 continue
 
             last_sgd_update += 1
-
             if last_sgd_update < sgd_update_frequency:
                 continue
-
             last_sgd_update = 0
 
-            rng = np.random.default_rng()
-            mini_batch_idx = rng.choice(len(D), mini_batch_size)
+            mini_batch = random.sample(D, mini_batch_size)
+            mini_batch = list(zip(*mini_batch))
 
-            for idx in mini_batch_idx:
-                transition = D[idx]
-                frame_arr, action, reward, next_frame_arr, done = transition
-                target = reward if done \
-                    else reward + discount_factor \
-                    * Q_target.get_greedy_action(next_frame_arr)
+            non_final_mask = torch.tensor(
+                tuple(map(lambda next_state: next_state is not None,
+                          mini_batch[3])), dtype=torch.bool)
+            non_final_next_states = torch.cat([
+                next_state for next_state in mini_batch[3]
+                if next_state is not None
+            ])
 
-                loss = (target - Q.get_greedy_action(frame_arr))**2
-                Q.gradient_descent_step(loss)
+            state_batch = torch.stack(mini_batch[0]).type(torch.FloatTensor)
+            action_batch = torch.stack(mini_batch[1])
+            reward_batch = torch.stack(mini_batch[2])
 
-                last_Q_target_update += 1
-                trained_frames_count += 1
+            state_action_values = Q(state_batch).gather(1, action_batch)
 
-                if last_Q_target_update % C == 0:
-                    Q_target = deepcopy(Q)
+            last_Q_target_update += 1
+            trained_frames_count += 1
 
-                if trained_frames_count == nframes:
-                    return
+            if last_Q_target_update % C == 0:
+                Q_target = deepcopy(Q)
+
+            if trained_frames_count == nframes:
+                return
 
 
 def main():
@@ -126,19 +121,23 @@ def main():
     env = gym.make('Breakout-v0', frameskip=4)
 
     nframes = 50000000  # train for a total of 50 million frames
-    Q = deep_qlearning(env, nframes)
+    discount_factor = 0.99
+    N = 1000000  # replay memory size
+    C = 10000  # number of steps before updating Q target network
+    mini_batch_size = 32
+    # minimum size of replay memory before learning starts
+    # replay_start_size = 50000
+    replay_start_size = 40
+    # number of action selections in between consecutive mini batch SGD updates
+    sgd_update_frequency = 4
+
+    Q = deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
+                       replay_start_size, sgd_update_frequency)
 
     # print(env.action_space.n)
     # print(env.observation_space.shape)
     # print(env.get_action_meanings())
     # print(env.get_keys_to_action())
-
-    # for i in range(10):
-    #     action = env.action_space.sample()
-    #     print(action)
-    #     state, reward, done, _ = env.step(action)
-    #     env.render()
-
 
 
 if __name__ == "__main__":
