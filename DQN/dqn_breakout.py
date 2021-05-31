@@ -1,4 +1,3 @@
-import random
 from collections import deque
 import numpy as np
 import gym
@@ -110,6 +109,7 @@ def deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
             save_stuff(Q, episode_lengths)
             print(f'episodes completed = {episodes_count},',
                   f'frames processed = {frames_count}')
+
 
 def main():
     # Note: setting frameskip to an int makes the game deterministic
