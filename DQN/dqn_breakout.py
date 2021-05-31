@@ -132,10 +132,10 @@ def main():
     momentum = 0.95  # momentum value used by RMSprop
     m = 4  # number of consecutive frames to stack for input to Q network
 
-    Q, episode_lengths = deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
-                       replay_start_size, sgd_update_frequency,
-                       initial_exploration, final_exploration,
-                       final_exploration_frame, lr, momentum, m)
+    Q, episode_lengths = deep_qlearning(
+        env, nframes, discount_factor, N, C, mini_batch_size, replay_start_size,
+        sgd_update_frequency, initial_exploration, final_exploration,
+        final_exploration_frame, lr, momentum, m)
 
     save_stuff(Q, episode_lengths)
 
