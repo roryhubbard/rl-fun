@@ -1,11 +1,13 @@
 from collections import deque
 import random
+import pickle
 import torch
 
 
 def preprocess_frame(frame):
     """
     210 x 160 x 3 -> 80 x 80
+    Paper uses 84 x 84 but this is more convenient
     """
     grayscale = frame @ [0.2989, 0.5870, 0.1140]
     cropped = grayscale[35:195]
@@ -13,13 +15,11 @@ def preprocess_frame(frame):
     return downsampled
 
 
-def initialize_frame_sequence(env, Q, m, epsilon):
+def initialize_frame_sequence(env, m):
     """
     Input:
     - env: environment
-    - Q: network that maps states to actions
     - m: number of consecutive frames to stack for input to Q network
-    - epsilon: probability of exploring
 
     Output:
     - frame_sequence: sequence of preprocessed observed frames from actions
@@ -28,14 +28,12 @@ def initialize_frame_sequence(env, Q, m, epsilon):
     frame_sequence.append(preprocess_frame(env.reset()))
 
     for _ in range(m-1):
-        # epsilon = some function of initial_exploration and final_exploration
-        # action = Q.get_epsilon_greedy_action(state, epsilon)
         action = env.action_space.sample()
         frame, _, done, _ = env.step(action)
 
         # if episode finishes before sequence is filled, try again
         if done:
-            return initialize_frame_sequence(env, Q, m, epsilon)
+            return initialize_frame_sequence(env, m)
 
         frame_sequence.append(preprocess_frame(frame))
 
@@ -43,12 +41,12 @@ def initialize_frame_sequence(env, Q, m, epsilon):
 
 
 def annealed_epsilon(initial_exploration, final_exploration,
-                     final_exploration_frame, trained_frames_count):
+                     final_exploration_frame, frames_count):
     """
     Return linearly annealed exploration value
     """
     return initial_exploration - (initial_exploration - final_exploration) \
-        * trained_frames_count / final_exploration_frame
+        * frames_count / final_exploration_frame
 
 
 def get_greedy_action(Q, state):
@@ -64,7 +62,7 @@ def get_epsilon_greedy_action(Q, state, epsilon, n_actions):
     Input:
     - Q: network that maps states to actions
     - state: current state as given by the environment
-    - epsilon: probability of "exploring" or choosing a random action
+    - epsilon: probability of exploring
     - n_actions: action space cardinality
 
     Output:
@@ -74,3 +72,9 @@ def get_epsilon_greedy_action(Q, state, epsilon, n_actions):
                         dtype=torch.int64) \
         if random.uniform(0.0, 1.0) < epsilon \
         else get_greedy_action(Q, state)
+
+
+def save_stuff(Q, episode_lengths):
+    torch.save(Q, 'DQN/trained_Q.pth')
+    with open("DQN/episode_lengths.txt", "wb") as f:
+        pickle.dump(episode_lengths, f)
