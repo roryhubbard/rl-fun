@@ -18,15 +18,15 @@ plt.rcParams["figure.autolayout"] = True
 # plt.rcParams['legend.facecolor'] = 'white'
 
 
-with open("DQN/episode_lengths.txt", "rb") as f:
-    episode_lengths = pickle.load(f)
+with open("DQN/episode_rewards.txt", "rb") as f:
+    episode_rewards = pickle.load(f)
 
-averaged_episode_lengths = np.convolve(
-    episode_lengths, np.ones(100)/100, mode='valid')
+averaged_episode_rewards = np.convolve(
+    episode_rewards, np.ones(100)/100, mode='valid')
 
 fig, ax = plt.subplots()
-ax.plot(episode_lengths, label='true')
-ax.plot(averaged_episode_lengths, label='averaged')
+ax.plot(episode_rewards, label='true')
+ax.plot(averaged_episode_rewards, label='averaged')
 
 ax.legend()
 plt.show()

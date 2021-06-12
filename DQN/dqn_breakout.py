@@ -1,8 +1,11 @@
 from collections import deque
+from copy import deepcopy
 import numpy as np
 import gym
 import torch
+import torch.nn as nn
 import torch.optim as optim
+import torchvision.transforms as T
 from q_network import QNetwork
 from utils import preprocess_frame, initialize_frame_sequence, \
     annealed_epsilon, get_epsilon_greedy_action, save_stuff
@@ -39,11 +42,12 @@ def deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
     """
     n_actions = env.action_space.n
     Q = QNetwork(n_actions)
-    Q_target = QNetwork(n_actions)
-    Q_target.load_state_dict(Q.state_dict())
+    Q_target = deepcopy(Q)
     Q_target.eval()
 
+    transform = T.Compose([T.ToTensor()])
     optimizer = optim.RMSprop(Q.parameters(), lr=lr, momentum=momentum)
+    criterion = nn.MSELoss()
 
     D = deque(maxlen=N)  # replay memory
 
@@ -51,14 +55,13 @@ def deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
     frames_count = 0
     last_sgd_update = 0
     episodes_count = 0
-    episode_lengths = []
+    episode_rewards = []
 
     while True:
         frame_sequence = initialize_frame_sequence(env, m)
-        state = torch.as_tensor(
-            np.stack(frame_sequence)).type(torch.FloatTensor)
+        state = transform(np.stack(frame_sequence, axis=2))
 
-        episode_length = 0
+        episode_reward = 0
         done = False
 
         while not done:
@@ -70,14 +73,13 @@ def deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
             frame, reward, done, _ = env.step(action.item())
             reward = torch.tensor([reward])
 
-            episode_length += 1
+            episode_reward += reward.item()
             if done:
                 next_state = None
-                episode_lengths.append(episode_length)
+                episode_rewards.append(episode_reward)
             else:
                 frame_sequence.append(preprocess_frame(frame))
-                next_state = torch.as_tensor(
-                    np.stack(frame_sequence)).type(torch.FloatTensor)
+                next_state = transform(np.stack(frame_sequence, axis=2))
 
             # store transition in replay memory
             D.append((state, action, reward, next_state))
@@ -93,20 +95,21 @@ def deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
             last_sgd_update = 0
 
             sgd_update(Q, Q_target, D, mini_batch_size,
-                       discount_factor, optimizer)
+                       discount_factor, optimizer, criterion)
 
             last_Q_target_update += 1
             frames_count += mini_batch_size
 
             if last_Q_target_update % C == 0:
-                Q_target.load_state_dict(Q.state_dict())
+                Q_target = deepcopy(Q)
+                Q_target.eval()
 
             if frames_count >= nframes:
-                return Q, episode_lengths
+                return Q, episode_rewards
 
         episodes_count += 1
         if episodes_count % 100 == 0:
-            save_stuff(Q, episode_lengths)
+            save_stuff(Q, episode_rewards)
             print(f'episodes completed = {episodes_count},',
                   f'frames processed = {frames_count}')
 
@@ -120,7 +123,7 @@ def main():
 
     nframes = 50000000  # train for a total of 50 million frames
     discount_factor = 0.99
-    N = 1000000  # replay memory size
+    N = 200000  # replay memory size (paper uses 1000000)
     C = 10000  # number of steps before updating Q target network
     mini_batch_size = 32
     replay_start_size = 50000  # minimum size of replay memory before learning starts
@@ -132,12 +135,12 @@ def main():
     momentum = 0.95  # momentum value used by RMSprop
     m = 4  # number of consecutive frames to stack for input to Q network
 
-    Q, episode_lengths = deep_qlearning(
+    Q, episode_rewards = deep_qlearning(
         env, nframes, discount_factor, N, C, mini_batch_size, replay_start_size,
         sgd_update_frequency, initial_exploration, final_exploration,
         final_exploration_frame, lr, momentum, m)
 
-    save_stuff(Q, episode_lengths)
+    save_stuff(Q, episode_rewards)
 
 
 if __name__ == "__main__":
