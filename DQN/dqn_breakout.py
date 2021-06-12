@@ -123,7 +123,7 @@ def main():
 
     nframes = 50000000  # train for a total of 50 million frames
     discount_factor = 0.99
-    N = 200000  # replay memory size (paper uses 1000000)
+    N = 100000  # replay memory size (paper uses 1000000)
     C = 10000  # number of steps before updating Q target network
     mini_batch_size = 32
     replay_start_size = 50000  # minimum size of replay memory before learning starts
