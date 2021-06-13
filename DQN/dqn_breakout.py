@@ -17,7 +17,7 @@ from network_update import sgd_update
 
 def deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
                    replay_start_size, sgd_update_frequency, initial_exploration,
-                   final_exploration, final_exploration_frame, lr, momentum, m):
+                   final_exploration, final_exploration_frame, lr, alpha, m):
     """
     Input:
     - env: environment
@@ -34,7 +34,7 @@ def deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
     - final_exploration_frame: number of frames over which the epsilon is
       annealed to its final value
     - lr: learning rate used by RMSprop
-    - momentum: momentum value used by RMSprop
+    - alpha: alpha value used by RMSprop
     - m: number of consecutive frames to stack for input to Q network
 
     Output:
@@ -46,7 +46,7 @@ def deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
     Q_target.eval()
 
     transform = T.Compose([T.ToTensor()])
-    optimizer = optim.RMSprop(Q.parameters(), lr=lr, momentum=momentum)
+    optimizer = optim.RMSprop(Q.parameters(), lr=lr, alpha=alpha)
     criterion = nn.MSELoss()
 
     D = deque(maxlen=N)  # replay memory
@@ -68,8 +68,10 @@ def deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
             epsilon = annealed_epsilon(
                 initial_exploration, final_exploration,
                 final_exploration_frame, frames_count)
+
             action = get_epsilon_greedy_action(
                 Q, state.unsqueeze(0), epsilon, n_actions)
+
             frame, reward, done, _ = env.step(action.item())
             reward = torch.tensor([reward])
 
@@ -81,7 +83,6 @@ def deep_qlearning(env, nframes, discount_factor, N, C, mini_batch_size,
                 frame_sequence.append(preprocess_frame(frame))
                 next_state = transform(np.stack(frame_sequence, axis=2))
 
-            # store transition in replay memory
             D.append((state, action, reward, next_state))
 
             state = next_state
@@ -132,13 +133,13 @@ def main():
     final_exploration = 0.1  # final epsilon value
     final_exploration_frame = 1000000  # number of frames over which the epsilon is annealed to its final value
     lr = 0.00025  # learning rate used by RMSprop
-    momentum = 0.95  # momentum value used by RMSprop
+    alpha = 0.95  # alpha value used by RMSprop
     m = 4  # number of consecutive frames to stack for input to Q network
 
     Q, episode_rewards = deep_qlearning(
         env, nframes, discount_factor, N, C, mini_batch_size, replay_start_size,
         sgd_update_frequency, initial_exploration, final_exploration,
-        final_exploration_frame, lr, momentum, m)
+        final_exploration_frame, lr, alpha, m)
 
     save_stuff(Q, episode_rewards)
 
