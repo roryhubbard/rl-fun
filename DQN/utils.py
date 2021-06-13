@@ -11,9 +11,9 @@ def preprocess_frame(frame):
     Paper uses 84 x 84 but this is more convenient
     """
     cropped = frame[35:195]
-    grayscale = cropped @ [0.2989, 0.5870, 0.1140]
-    downsampled = grayscale[::2,::2]
-    return downsampled.astype(np.uint8)
+    downsampled = cropped[::2,::2]
+    grayscale = downsampled @ [0.2989, 0.5870, 0.1140]
+    return grayscale.astype(np.uint8)
 
 
 def initialize_frame_sequence(env, m):
