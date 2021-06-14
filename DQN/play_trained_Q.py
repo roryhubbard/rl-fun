@@ -10,7 +10,7 @@ import time
 
 Q = torch.load('DQN/trained_Q.pth')
 Q.eval()
-env = gym.make('Breakout-v0')
+env = gym.make('Breakout-v0', frameskip=4)
 env.reset()
 
 m = 4
