@@ -8,9 +8,9 @@ def main():
   # states: [x, theta, x', theta']
   env = gym.make('InvertedPendulum-v2')
 
-  T = 2048
-  epochs = 10
+  T = 2048 # environement steps per update
   batch_size = 64
+  epochs = 10
   discount = 0.99
   clipping_epsilon = 0.2
   lam = 0.95 # GAE parameter
@@ -19,34 +19,53 @@ def main():
   actor = Actor()
   critic = Critic()
 
-  D = [] # experience replay bufffer [(state, action, reward, next_state), ...]
+  n_updates = total_timesteps // T
+  n_batches_per_update = T // batch_size
 
-  for t in range(T):
-    state = env.reset()
-    done = False
+  for update in range(n_updates):
 
-    while not done:
-      #action = env.action_space.sample()
+    states = []
+    actions = []
+    rewards = []
+    dones = []
+    state_values = []
+    advantages = []
+    done = True
+
+    for _ in range(T):
+      if done:
+        state = env.reset()
+        episode_lenth = 0
+
+      states.append(state)
       state_value = critic.get_value(state)
-      action = actor.get_action(state)
+      state_values.append(state_value)
 
+      #action = env.action_space.sample()
+      action = actor.get_action(state)
       next_state, reward, done, _ = env.step(action)
 
-      experience = (state, action, reward, next_state) if not done \
-          else (state, action, reward, None)
+      if not done:
+        state = next_state
+      actions.append(action)
+      rewards.append(reward)
+      dones.append(done)
 
-      D.append(experience)
-      state = next_state
+      episode_length += 1
 
-      current_advantage = reward + discount * critic.get_value(next_state) - state_value \
-          if not done else reward - state_value
+      for i in range(episode_length):
+        delta = rewards[i] + discount * critic.get_value(state[i+1]) - critic.get_value[i]
+        advantage_estimate += (discount * lam)**t * delta
 
-      advantage_estimate += (discount * lam)**t * current_advantage
+      #env.render()
 
-      env.render()
+    advantage_estimates = []
+    value_estimates = []
+
 
     for k in range(epochs):
-      pass
+      for n in range(0, n_batches_per_update, batch_size):
+        pass
 
   env.close()
 
