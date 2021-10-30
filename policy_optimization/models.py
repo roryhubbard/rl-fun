@@ -7,8 +7,7 @@ def initialize_fc_weights(m, n):
   m = number of inputs
   n = number of outputs
   """
-  rng = np.random.default_rng()
-  return rng.uniform(-math.sqrt(6/(m+n)), math.sqrt(6/(m+n)), (m,n))
+  return np.random.default_rng().uniform(-math.sqrt(6/(m+n)), math.sqrt(6/(m+n)), (m,n))
 
 
 class Relu:
@@ -39,7 +38,7 @@ class Tanh:
 
 class Linear:
 
-  def __init__(self, n_inputs, n_outputs, activation='relu'):
+  def __init__(self, n_inputs, n_outputs, activation=None):
     self.W = initialize_fc_weights(n_inputs, n_outputs)
     self.b = np.zeros(n_outputs)
 
@@ -49,7 +48,10 @@ class Linear:
     self.input_cache = None
     self.output_cache = None
 
-    self.activation = Relu() if activation == 'relu' else Tanh()
+    if activation is None:
+      self.activation = None
+    else:
+      self.activation = Relu() if activation == 'relu' else Tanh()
 
   def forward(self, x):
     self.input_cache = x
@@ -69,9 +71,14 @@ class Actor:
   def __init__(self):
     self.l1 = Linear(4, 64, activation='tanh')
     self.l2 = Linear(64, 64, activation='tanh')
+    self.output = Linear(64, 1, activation=None)
+    self.std = 1
 
-  def get_actions(self, x):
-    return None
+  def get_action(self, x):
+    h1 = self.l1(x)
+    h2 = self.l2(h1)
+    mu = self.output(h2)
+    return np.random.default_rng().normal(mu, self.std)
 
   def forward(self, x):
     pass

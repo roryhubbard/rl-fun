@@ -29,6 +29,7 @@ def main():
     rewards = []
     dones = []
     state_values = []
+    log_probs = []
     done = True
 
     for _ in range(T):
@@ -38,13 +39,15 @@ def main():
       #action = env.action_space.sample()
       state_value = critic.get_value(state)
       action = actor.get_action(state)
+      log_prob = np.exp(action)
       next_state, reward, done, _ = env.step(action)
 
       states.append(state)
-      state_values.append(state_value)
       actions.append(action)
       rewards.append(reward)
       dones.append(done)
+      state_values.append(state_value)
+      log_probs.append(log_prob)
 
       state = next_state
 
