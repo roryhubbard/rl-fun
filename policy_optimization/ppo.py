@@ -29,39 +29,38 @@ def main():
     rewards = []
     dones = []
     state_values = []
-    advantages = []
     done = True
 
     for _ in range(T):
       if done:
         state = env.reset()
-        episode_lenth = 0
-
-      states.append(state)
-      state_value = critic.get_value(state)
-      state_values.append(state_value)
 
       #action = env.action_space.sample()
+      state_value = critic.get_value(state)
       action = actor.get_action(state)
       next_state, reward, done, _ = env.step(action)
 
-      if not done:
-        state = next_state
+      states.append(state)
+      state_values.append(state_value)
       actions.append(action)
       rewards.append(reward)
       dones.append(done)
 
-      episode_length += 1
-
-      for i in range(episode_length):
-        delta = rewards[i] + discount * critic.get_value(state[i+1]) - critic.get_value[i]
-        advantage_estimate += (discount * lam)**t * delta
+      state = next_state
 
       #env.render()
 
-    advantage_estimates = []
-    value_estimates = []
+    # compute state value estimate for very last state
+    # so that the GAE of the last element in the state array can be computed
+    state_values.append(critic.get_value(state))
 
+    gae = 0
+    advantages = [None] * T
+
+    for i in reversed(range(T)):
+      delta = rewards[i] + (1 - dones[i]) * discount * state_values[i+1] - state_values[i]
+      gae = delta + (1 - dones[i]) * discount * lam * delta
+      advantages[i] = gae
 
     for k in range(epochs):
       for n in range(0, n_batches_per_update, batch_size):
