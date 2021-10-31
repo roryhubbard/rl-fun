@@ -1,4 +1,3 @@
-import math
 import numpy as np
 
 
@@ -7,7 +6,7 @@ def initialize_fc_weights(m, n):
   m = number of inputs
   n = number of outputs
   """
-  return np.random.default_rng().uniform(-math.sqrt(6/(m+n)), math.sqrt(6/(m+n)), (m,n))
+  return np.random.default_rng().uniform(-np.sqrt(6/(m+n)), np.sqrt(6/(m+n)), (m,n))
 
 
 class Relu:
@@ -72,13 +71,20 @@ class Actor:
     self.l1 = Linear(4, 64, activation='tanh')
     self.l2 = Linear(64, 64, activation='tanh')
     self.output = Linear(64, 1, activation=None)
-    self.std = 1
+    self.log_std = 0
+
+  # https://pytorch.org/docs/stable/_modules/torch/distributions/normal.html#Normal.log_prob
+  # https://stats.stackexchange.com/questions/404191/what-is-the-log-of-the-pdf-for-a-normal-distribution
+  def log_prob(self, value, mean, std):
+    return -((x - mean)**2) / (2 * std**2) - self.log_std - np.log(2 * np.pi) / 2
 
   def get_action(self, x):
     h1 = self.l1(x)
     h2 = self.l2(h1)
-    mu = self.output(h2)
-    return np.random.default_rng().normal(mu, self.std)
+    mean = self.output(h2)
+    std = np.exp(self.log_std)
+    action = np.random.default_rng().normal(mean, std)
+    return action, self.log_prob(action, mean, std)
 
   def forward(self, x):
     pass
@@ -92,9 +98,13 @@ class Critic:
   def __init__(self):
     self.l1 = Linear(4, 64, activation='relu')
     self.l2 = Linear(64, 64, activation='relu')
+    self.output = Linear(64, 1, activation=None)
 
   def get_value(self, x):
-    return None
+    h1 = self.l1(x)
+    h2 = self.l2(h1)
+    value = self.output(h2)
+    return value
 
   def forward(self, x):
     pass
