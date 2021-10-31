@@ -38,8 +38,7 @@ def main():
 
       #action = env.action_space.sample()
       state_value = critic.get_value(state)
-      action = actor.get_action(state)
-      log_prob = np.exp(action)
+      action, log_prob = actor.get_action(state)
       next_state, reward, done, _ = env.step(action)
 
       states.append(state)
@@ -64,6 +63,11 @@ def main():
       delta = rewards[i] + (1 - dones[i]) * discount * state_values[i+1] - state_values[i]
       gae = delta + (1 - dones[i]) * discount * lam * delta
       advantages[i] = gae
+
+    # rewards to go are the discounted rewards through an episode which can be recovered
+    # by adding the state values back to the advantages (look at delta calculation above)
+    # this does make the rewards discounted by discount * lam instead of just discount
+    rewards_to_go = advantages + state_values
 
     for k in range(epochs):
       for n in range(0, n_batches_per_update, batch_size):
