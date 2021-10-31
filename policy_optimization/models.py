@@ -52,7 +52,7 @@ class Linear:
     else:
       self.activation = Relu() if activation == 'relu' else Tanh()
 
-  def forward(self, x):
+  def __call__(self, x, grad=False):
     self.input_cache = x
     out = x @ self.W + self.b
     self.output_cache = out
@@ -78,16 +78,14 @@ class Actor:
   def log_prob(self, value, mean, std):
     return -((x - mean)**2) / (2 * std**2) - self.log_std - np.log(2 * np.pi) / 2
 
-  def get_action(self, x):
-    h1 = self.l1(x)
-    h2 = self.l2(h1)
-    mean = self.output(h2)
+  def forward(self, state, action=None, grad=False):
+    h1 = self.l1(state, grad)
+    h2 = self.l2(h1, grad)
+    mean = self.output(h2, grad)
     std = np.exp(self.log_std)
-    action = np.random.default_rng().normal(mean, std)
+    action = np.random.default_rng().normal(mean, std) \
+      if action is None else action
     return action, self.log_prob(action, mean, std)
-
-  def forward(self, x):
-    pass
 
   def backward(self, loss):
     pass
@@ -100,8 +98,8 @@ class Critic:
     self.l2 = Linear(64, 64, activation='relu')
     self.output = Linear(64, 1, activation=None)
 
-  def get_value(self, x):
-    h1 = self.l1(x)
+  def get_value(self, state):
+    h1 = self.l1(state)
     h2 = self.l2(h1)
     value = self.output(h2)
     return value
