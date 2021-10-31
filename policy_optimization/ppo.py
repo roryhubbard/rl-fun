@@ -20,7 +20,9 @@ def main():
   critic = Critic()
 
   n_updates = total_timesteps // T
-  n_batches_per_update = T // batch_size
+  n_batches_per_update = T // batch_size + 1
+  if T % batch_size != 0:
+    n_batches_per_update += 1
 
   for update in range(n_updates):
 
@@ -37,8 +39,8 @@ def main():
         state = env.reset()
 
       #action = env.action_space.sample()
-      state_value = critic.get_value(state)
-      action, log_prob = actor.get_action(state)
+      state_value = critic.forward(state)
+      action, log_prob = actor.forward(state)
       next_state, reward, done, _ = env.step(action)
 
       states.append(state)
@@ -69,9 +71,29 @@ def main():
     # this does make the rewards discounted by discount * lam instead of just discount
     rewards_to_go = advantages + state_values
 
+    rng = np.random.default_rng()
+    idx = np.arange(T)
     for k in range(epochs):
+      rng.shuffle(idx)
       for n in range(0, n_batches_per_update, batch_size):
-        pass
+        batch_idx = idx[n:n+batch_size]
+        batch_states = states[batch_idx]
+        batch_actions = actions[batch_idx]
+        batch_rtg = rewards_to_go[batch_idx]
+        batch_state_values = state_values[batch_idx]
+        batch_advantages = advantages[batch_idx]
+        batch_log_probs = log_probs[batch_idx]
+
+        _, current_log_probs = actor.forward(batch_states, batch_actions, grad=True)
+
+        ratios = np.exp(np.array(current_log_probs) - np.array(batch_log_probs))
+        clipped_ratios = np.minimum(1+clipping_epsilon,
+                                    np.maximum(1-clipping_epsilon, ratios))
+        actor_loss = -np.minimum(ratios * batch_advantages,
+                                 clipped_ratios * batch_advantages).mean()
+
+        current_state_values = critic.forward(batch_states, grad=True)
+        critic_loss = np.square(batch_rtg - current_state_values).mean()
 
   env.close()
 
