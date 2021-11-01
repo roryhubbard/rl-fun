@@ -3,6 +3,9 @@ import numpy as np
 
 def initialize_fc_weights(m, n):
   """
+  https://www.deeplearningbook.org/contents/optimization.html
+  section 8.4, equation 8.23
+
   m = number of inputs
   n = number of outputs
   """
