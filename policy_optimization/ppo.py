@@ -25,51 +25,45 @@ def main():
     n_batches_per_update += 1
 
   for update in range(n_updates):
+    states = np.empty(T)
+    actions = np.empty(T)
+    rewards = np.empty(T)
+    returns = np.empty(T) # discounted
+    dones = np.empty(T)
+    state_values = np.empty(T+1)
+    log_probs = np.empty(T)
+    advantages = np.empty(T)
 
-    states = []
-    actions = []
-    rewards = []
-    dones = []
-    state_values = []
-    log_probs = []
-    done = True
+    state = env.reset()
 
-    for _ in range(T):
-      if done:
-        state = env.reset()
-
-      #action = env.action_space.sample()
+    for t in range(T):
       state_value = critic.forward(state)
       action, log_prob = actor.forward(state)
       next_state, reward, done, _ = env.step(action)
 
-      states.append(state)
-      actions.append(action)
-      rewards.append(reward)
-      dones.append(done)
-      state_values.append(state_value)
-      log_probs.append(log_prob)
+      states[t] = state
+      actions[t] = action
+      rewards[t] = reward
+      dones[t] = done
+      state_values[t] = state_value
+      log_probs[t] = log_prob
 
-      state = next_state
+      state = env.reset() if done else next_state
 
-      #env.render()
+    # compute state value estimate and reward for very last state
+    # state value is 0 if it ended in a terminal state (done==true)
+    # bootstrap the initial discounted reward to this state value
+    state_values[T] = critic.get_value(state) if not done else 0
+    discounted_reward = state_value[T]
 
-    # compute state value estimate for very last state
-    # so that the GAE of the last element in the state array can be computed
-    state_values.append(critic.get_value(state))
-
+    next_non_terminal = 1 - dones
+    deltas = rewards + next_non_terminal * discount * state_values[1:] - state_values[:-1]
     gae = 0
-    advantages = [None] * T
-
-    for i in reversed(range(T)):
-      delta = rewards[i] + (1 - dones[i]) * discount * state_values[i+1] - state_values[i]
-      gae = delta + (1 - dones[i]) * discount * lam * delta
+    for i in reversed(range(len(deltas))):
+      gae = delta[i] + next_non_terminal[i] * discount * lam * gae
       advantages[i] = gae
-
-    # rewards to go are the discounted rewards through an episode which can be recovered
-    # by adding the state values back to the advantages (look at delta calculation above)
-    # this does make the rewards discounted by discount * lam instead of just discount
-    rewards_to_go = advantages + state_values
+      discounted_reward = rewards[i] + next_non_terminal[i] * discount * discounted_reward
+      returns[i] = discounted_reward
 
     rng = np.random.default_rng()
     idx = np.arange(T)
