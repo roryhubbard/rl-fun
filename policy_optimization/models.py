@@ -17,12 +17,14 @@ class Relu:
   def __init__(self):
     self.grad = None
 
-  def forward(self, x):
-    self.grad = np.zeros(*x.shape) if x.ndim == 1 else np.zeros(x.shape)
-    self.grad[x > 0] = 1
+  def __call__(self, x, requires_grad):
+    if requires_grad:
+      self.grad = np.zeros_like(x)
+      self.grad[x > 0] = 1
     return np.maximum(x, 0)
 
   def backward(self):
+    assert self.grad is not None
     return self.grad
 
 
@@ -31,10 +33,13 @@ class Tanh:
   def __init__(self):
     self.grad = None
 
-  def forward(self, x):
+  def __call__(self, x, requires_grad):
+    if requires_grad:
+      pass
     pass
 
   def backward(self):
+    assert self.grad is not None
     return self.grad
 
 
@@ -55,13 +60,14 @@ class Linear:
     else:
       self.activation = Relu() if activation == 'relu' else Tanh()
 
-  def __call__(self, x, grad=False):
-    self.input_cache = x
-    out = x @ self.W + self.b
-    self.output_cache = out
-    return out
+  def __call__(self, x, requires_grad):
+    preactivated = x @ self.W + self.b
+    if requires_grad:
+      self.input_cache = x
+      self.output_cache = preactivated
+    return self.activation(preactivated, requires_grad)
 
-  def backward(self, d):
+  def backward(self, delta):
     pass
 
   def step(self):
@@ -70,34 +76,37 @@ class Linear:
 
 class Actor:
 
-  def __init__(self):
-    self.l1 = Linear(4, 64, activation='tanh')
+  def __init__(self, nstates, nactions):
+    self.l1 = Linear(nstates, 64, activation='tanh')
     self.l2 = Linear(64, 64, activation='tanh')
-    self.output = Linear(64, 1, activation=None)
-    self.log_std = 0
+    self.output = Linear(64, nactions, activation=None)
+    self.log_std = np.zeros(nactions)
 
   # https://pytorch.org/docs/stable/_modules/torch/distributions/normal.html#Normal.log_prob
   # https://stats.stackexchange.com/questions/404191/what-is-the-log-of-the-pdf-for-a-normal-distribution
   def log_prob(self, value, mean, std):
     return -((x - mean)**2) / (2 * std**2) - self.log_std - np.log(2 * np.pi) / 2
 
-  def forward(self, state, action=None, grad=False):
-    h1 = self.l1(state, grad)
-    h2 = self.l2(h1, grad)
-    mean = self.output(h2, grad)
+  def forward(self, state, action=None, requires_grad=False):
+    h1 = self.l1(state, requires_grad)
+    h2 = self.l2(h1, requires_grad)
+    mean = self.output(h2, requires_grad)
     std = np.exp(self.log_std)
-    action = np.random.default_rng().normal(mean, std) \
-      if action is None else action
+    if action is None:
+      action = np.random.default_rng().normal(mean, std)
     return action, self.log_prob(action, mean, std)
 
   def backward(self, loss):
     pass
 
+  def optimization_step(self, lr):
+    pass
+
 
 class Critic:
 
-  def __init__(self):
-    self.l1 = Linear(4, 64, activation='relu')
+  def __init__(self, nstates):
+    self.l1 = Linear(nstates, 64, activation='relu')
     self.l2 = Linear(64, 64, activation='relu')
     self.output = Linear(64, 1, activation=None)
 
@@ -111,5 +120,8 @@ class Critic:
     pass
 
   def backward(self, loss):
+    pass
+
+  def optimization_step(self, lr):
     pass
 

@@ -5,8 +5,11 @@ from models import Actor, Critic
 
 
 def main():
-  # states: [x, theta, x', theta']
   env = gym.make('InvertedPendulum-v2')
+  # states: [x, theta, x', theta']
+  # action: [horizontal force]
+  nstates=4
+  nactions=1
 
   T = 2048 # environement steps per update
   batch_size = 64
@@ -17,8 +20,8 @@ def main():
   lam = 0.95 # GAE parameter
   total_timesteps = 1000000
 
-  actor = Actor(lr=lr)
-  critic = Critic(lr=lr)
+  actor = Actor(nstates, nactions)
+  critic = Critic(nstates)
 
   n_updates = total_timesteps // T
   n_batches_per_update = T // batch_size + 1
@@ -71,6 +74,7 @@ def main():
     critic_losses = []
     for k in range(epochs):
       np.random.default_rng().shuffle(idx)
+
       for n in range(0, n_batches_per_update, batch_size):
         batch_idx = idx[n:n+batch_size]
         batch_states = states[batch_idx]
@@ -80,18 +84,31 @@ def main():
         batch_advantages = advantages[batch_idx]
         batch_log_probs = log_probs[batch_idx]
 
-        _, current_log_probs = actor.forward(batch_states, batch_actions, grad=True)
+        _, current_log_probs = actor.forward(batch_states,
+                                             batch_actions, requires_grad=True)
         ratios = np.exp(current_log_probs - batch_log_probs)
         clipped_ratios = np.minimum(1+clipping_epsilon,
                                     np.maximum(1-clipping_epsilon, ratios))
+
         actor_loss = -np.minimum(ratios * batch_advantages,
                                  clipped_ratios * batch_advantages).mean()
 
-        current_state_values = critic.forward(batch_states, grad=True)
+        current_state_values = critic.forward(batch_states, requires_grad=True)
         critic_loss = np.square(batch_returns - current_state_values).mean()
+
+        dL_r = np.zeros_like(clipped_ratios) # derivative of actor_loss w.r.t ratios
+        dL_r[(ratios < 1 + clipping_epsilon)
+             & (ratios > 1 - clipping_epsilon)] = 1.0
+        dr_lp = ratios # derivative of ratios w.r.t. current_log_probs
+
+        d_actor_output = 0
+        d_critic_output = 0
 
         actor.backward()
         critic.backward()
+
+        actor.optimization_step(lr)
+        critic.optimization_step(lr)
 
         actor_losses.append(actor_loss)
         critic_losses.append(critic_loss)
