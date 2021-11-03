@@ -34,9 +34,10 @@ class Tanh:
     self.grad = None
 
   def __call__(self, X, requires_grad):
+    out = np.tanh(X)
     if requires_grad:
-      pass
-    pass
+      self.grad = 1 - out**2
+    return out
 
   def backward(self):
     assert self.grad is not None
@@ -117,6 +118,9 @@ class Actor:
     delta: derivative of loss w.r.t log prob of probability distribution
       that was sampled from for the selected action
     """
+    assert self.action_cache is not None
+    assert self.mean_cache is not None
+    assert self.std_cache is not None
     d_mean = -(self.action_cache - self.mean_cache) / self.std_cache**2
     d_h2 = self.l3.backward(d_mean)
     d_h1 = self.l2.backward(d_h2)
@@ -135,18 +139,23 @@ class Critic:
     self.l2 = Linear(64, 64, activation='relu')
     self.l3 = Linear(64, 1, activation=None)
 
-  def get_value(self, state):
-    h1 = self.l1(state)
-    h2 = self.l2(h1)
-    value = self.l3(h2)
+    self.value_cache = None
+
+  def forward(self, X, requires_grad=False):
+    h1 = self.l1(state, requires_grad)
+    h2 = self.l2(h1, requires_grad)
+    value = self.l3(h2, requires_grad)
+    self.value_cache = value
     return value
 
-  def forward(self, X):
-    pass
-
   def backward(self, delta):
-    pass
+    assert self.value_cache is not None
+    d_h2 = self.l3.backward(delta)
+    d_h1 = self.l2.backward(d_h2)
+    _d_state = self.l1.backward(d_h1)
 
   def optimization_step(self, lr):
-    pass
+    self.l3.step(lr)
+    self.l2.step(lr)
+    self.l1.step(lr)
 
