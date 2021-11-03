@@ -12,7 +12,7 @@ def main():
   nactions=1
 
   T = 2048 # environement steps per update
-  batch_size = 64
+  batch_size = 32
   epochs = 10
   lr = 0.01
   discount = 0.99
@@ -29,7 +29,7 @@ def main():
     n_batches_per_update += 1
 
   for update in tqdm(range(n_updates)):
-    states = np.empty(T)
+    states = np.empty((T, nstates))
     actions = np.empty(T)
     rewards = np.empty(T)
     returns = np.empty(T) # discounted rewards
@@ -57,14 +57,14 @@ def main():
     # compute state value estimate and reward for very last state
     # state value is 0 if it ended in a terminal state (done==true)
     # bootstrap the initial discounted reward to this state value
-    state_values[T] = critic.get_value(state) if not done else 0
-    discounted_reward = state_value[T]
+    state_values[T] = critic.forward(state) if not done else 0
+    discounted_reward = state_values[T]
 
     next_non_terminal = 1 - dones
     deltas = rewards + next_non_terminal * discount * state_values[1:] - state_values[:-1]
     gae = 0
     for i in reversed(range(T)):
-      gae = delta[i] + next_non_terminal[i] * discount * lam * gae
+      gae = deltas[i] + next_non_terminal[i] * discount * lam * gae
       advantages[i] = gae
       discounted_reward = rewards[i] + next_non_terminal[i] * discount * discounted_reward
       returns[i] = discounted_reward
@@ -81,7 +81,7 @@ def main():
         batch_actions = actions[batch_idx]
         batch_returns = returns[batch_idx]
         batch_state_values = state_values[batch_idx]
-        batch_advantages = advantages[batch_idx]
+        batch_A = advantages[batch_idx]
         batch_log_probs = log_probs[batch_idx]
 
         _, current_log_probs = actor.forward(batch_states,
@@ -90,20 +90,22 @@ def main():
         clipped_ratios = np.minimum(1+clipping_epsilon,
                                     np.maximum(1-clipping_epsilon, ratios))
 
-        actor_loss = -np.minimum(ratios * batch_advantages,
-                                 clipped_ratios * batch_advantages).mean()
+        unclipped_surrogate = ratios * batch_A
+        clipped_surrogate = clipped_ratios * batch_A
+        actor_loss = -np.minimum(unclipped_surrogate, clipped_surrogate).mean()
 
         current_state_values = critic.forward(batch_states, requires_grad=True)
         critic_loss = 1/2 * np.square(batch_returns - current_state_values).mean()
 
         # derivative of actor_loss w.r.t current_log_probs
-        dAL_dlp = -batch_advantages * ratios
+        dAL_dlp = -unclipped_surrogate
         # derivative of clipped_ratios w.r.t ratios
         dcr_dr = np.zeros_like(ratios)
         dcr_dr[(ratios < 1 + clipping_epsilon)
              & (ratios > 1 - clipping_epsilon)] = 1.0
         # only include the derivative of the clipped_ratio if the clipped_ratio was used
-        dAL_dlp[clipped_ratios * A < ratios * A] *= dcr_dr
+        clipped_used_idx = clipped_surrogate < unclipped_surrogate
+        dAL_dlp[clipped_used_idx] *= dcr_dr[clipped_used_idx]
 
         # derivative of critic_loss w.r.t current_state_values
         dCL_dsv = batch_returns - current_state_values
