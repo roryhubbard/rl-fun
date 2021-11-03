@@ -28,7 +28,7 @@ def main():
   if T % batch_size != 0:
     n_batches_per_update += 1
 
-  for update in range(n_updates):
+  for update in tqdm(range(n_updates)):
     states = np.empty(T)
     actions = np.empty(T)
     rewards = np.empty(T)
@@ -94,18 +94,22 @@ def main():
                                  clipped_ratios * batch_advantages).mean()
 
         current_state_values = critic.forward(batch_states, requires_grad=True)
-        critic_loss = np.square(batch_returns - current_state_values).mean()
+        critic_loss = 1/2 * np.square(batch_returns - current_state_values).mean()
 
-        dL_r = np.zeros_like(clipped_ratios) # derivative of actor_loss w.r.t ratios
-        dL_r[(ratios < 1 + clipping_epsilon)
+        # derivative of actor_loss w.r.t current_log_probs
+        dAL_dlp = -batch_advantages * ratios
+        # derivative of clipped_ratios w.r.t ratios
+        dcr_dr = np.zeros_like(ratios)
+        dcr_dr[(ratios < 1 + clipping_epsilon)
              & (ratios > 1 - clipping_epsilon)] = 1.0
-        dr_lp = ratios # derivative of ratios w.r.t. current_log_probs
+        # only include the derivative of the clipped_ratio if the clipped_ratio was used
+        dAL_dlp[clipped_ratios * A < ratios * A] *= dcr_dr
 
-        d_actor_output = 0
-        d_critic_output = 0
+        # derivative of critic_loss w.r.t current_state_values
+        dCL_dsv = batch_returns - current_state_values
 
-        actor.backward()
-        critic.backward()
+        actor.backward(dAL_dlp)
+        critic.backward(dCL_dsv)
 
         actor.optimization_step(lr)
         critic.optimization_step(lr)
