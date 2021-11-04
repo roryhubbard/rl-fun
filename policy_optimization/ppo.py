@@ -1,6 +1,7 @@
 from tqdm import tqdm
 import gym
 import numpy as np
+import matplotlib.pyplot as plt
 from models import Actor, Critic
 
 
@@ -12,7 +13,7 @@ def main():
   nactions=1
 
   T = 2048 # environement steps per update
-  batch_size = 32
+  batch_size = 64
   epochs = 10
   lr = 0.01
   discount = 0.99
@@ -95,7 +96,7 @@ def main():
         actor_loss = -np.minimum(unclipped_surrogate, clipped_surrogate).mean()
 
         current_state_values = critic.forward(batch_states, requires_grad=True)
-        critic_loss = 1/2 * np.square(batch_returns - current_state_values).mean()
+        critic_loss = 1/2 * ((current_state_values - batch_returns)**2).mean()
 
         # derivative of actor_loss w.r.t current_log_probs
         dAL_dlp = -unclipped_surrogate
@@ -108,7 +109,7 @@ def main():
         dAL_dlp[clipped_used_idx] *= dcr_dr[clipped_used_idx]
 
         # derivative of critic_loss w.r.t current_state_values
-        dCL_dsv = batch_returns - current_state_values
+        dCL_dsv = current_state_values - batch_returns
 
         actor.backward(dAL_dlp)
         critic.backward(dCL_dsv)
@@ -118,6 +119,12 @@ def main():
 
         actor_losses.append(actor_loss)
         critic_losses.append(critic_loss)
+
+  fig, ax = plt.subplots()
+  ax.plot(actor_losses)
+  ax.plot(critic_losses)
+  plt.show()
+  plt.close()
 
   env.close()
 

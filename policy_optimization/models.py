@@ -104,14 +104,11 @@ class Actor:
     return -((value - mean)**2) / (2 * std**2) - self.log_std - np.log(2 * np.pi) / 2
 
   def forward(self, state, action=None, requires_grad=False):
-    is_batch = state.size > self.nstates
     h1 = self.l1(state, requires_grad)
     h2 = self.l2(h1, requires_grad)
     mean = self.l3(h2, requires_grad)
-    if is_batch:
+    if mean.ndim > 1:
       mean = mean.squeeze()
-    #batch_size = state.shape[0] if state.ndim > 1 else 1
-    #std = np.exp(np.broadcast_to(self.log_std, (batch_size, self.log_std.size))).squeeze()
     std = np.exp(self.log_std)
     if action is None:
       action = np.random.default_rng().normal(mean, std)
@@ -151,7 +148,9 @@ class Critic:
     h1 = self.l1(X, requires_grad)
     h2 = self.l2(h1, requires_grad)
     value = self.l3(h2, requires_grad)
-    return value.squeeze()
+    if value.ndim > 1:
+      value = value.squeeze()
+    return value
 
   def backward(self, delta):
     d_l2 = self.l3.backward(delta)
