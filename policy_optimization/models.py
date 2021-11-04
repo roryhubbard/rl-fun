@@ -24,7 +24,6 @@ class Relu:
     return np.maximum(X, 0)
 
   def backward(self):
-    assert self.grad is not None
     return self.grad
 
 
@@ -40,7 +39,6 @@ class Tanh:
     return out
 
   def backward(self):
-    assert self.grad is not None
     return self.grad
 
 
@@ -71,21 +69,11 @@ class Linear:
     delta: derivative of loss w.r.t log prob of probability distribution
       that was sampled from for the selected action
     """
-    assert self.input_cache is not None
-    activation_grad = self.activation.backward() if self.activation is not None else 1
-    d_preactivated = delta * activation_grad
+    d_preactivated = delta * self.activation.backward() if self.activation is not None else delta
     self.grad_b = d_preactivated.mean(axis=0)
-    self.grad_W = np.outer(self.input_cache, d_preactivated).mean(axis=0)
-
     if d_preactivated.ndim == 1:
       d_preactivated = d_preactivated[:, np.newaxis]
-    print(d_preactivated.shape)
-    print(self.input_cache.shape)
-    a = np.einsum('bi,bi->bi', d_preactivated, self.input_cache)
-    print(a.shape)
-    print('')
-    if d_preactivated.ndim == 1:
-      d_preactivated = d_preactivated[:, np.newaxis]
+    self.grad_W = np.einsum('bi,bj->bij', self.input_cache, d_preactivated).mean(axis=0)
     grad_input = d_preactivated @ self.W.T
     return grad_input
 
@@ -139,10 +127,8 @@ class Actor:
       - derivative of loss w.r.t log prob of probability distribution
         that was sampled from for the selected action
     """
-    assert self.action_cache is not None
-    assert self.mean_cache is not None
-    assert self.std_cache is not None
     d_mean = -(self.action_cache - self.mean_cache) / self.std_cache**2
+    assert delta.shape == d_mean.shape
     d_l3 = delta * d_mean
     d_l2 = self.l3.backward(d_l3)
     d_l1 = self.l2.backward(d_l2)
