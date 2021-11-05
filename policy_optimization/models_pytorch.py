@@ -39,5 +39,5 @@ class Critic(nn.Module):
   def forward(self, x):
     h = torch.relu(self.h1(x))
     h = torch.relu(self.h2(h))
-    return self.h3(h)
+    return self.h3(h).squeeze()
 
