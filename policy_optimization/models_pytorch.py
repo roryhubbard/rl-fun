@@ -20,12 +20,12 @@ class Actor(nn.Module):
   def forward(self, x, action=None):
     h = torch.tanh(self.h1(x))
     h = torch.tanh(self.h2(h))
-    mu = self.h3(h)
+    mu = self.h3(h).squeeze()
     std = torch.exp(self.log_std)
     pd = Normal(mu, std)
     if action is None:
       action = pd.sample()
-    return action, pd.log_prob(action).sum(axis=-1)
+    return action, pd.log_prob(action)
 
 
 class Critic(nn.Module):
