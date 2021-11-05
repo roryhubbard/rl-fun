@@ -91,6 +91,7 @@ def compute_critic_loss(critic, state, G):
 
 def main():
   env = gym.make('InvertedPendulum-v2')
+  #env = gym.make('InvertedDoublePendulum-v2')
   # states: [x, theta, x', theta']
   # action: [horizontal force]
   nstates = env.observation_space.shape[0]
@@ -121,6 +122,7 @@ def main():
     n_batches_per_update += 1
 
   episode_rewards = []
+  critic_losses = []
   for update in tqdm(range(n_updates)):
     states, actions, rewards, dones, values, log_probs, ep_rewards = rollout(
       env, actor, critic, T, nstates, max_ep_length)
@@ -129,7 +131,6 @@ def main():
     advantages, returns = get_advantages_and_returns(dones, rewards, values, discount, lam, T)
 
     idx = np.arange(T)
-    critic_losses = []
 
     states = torch.as_tensor(states, dtype=torch.float32)
     actions = torch.as_tensor(actions, dtype=torch.float32)
@@ -172,7 +173,7 @@ def main():
   plt.close()
 
   fig, ax = plt.subplots()
-  ax.plot(critic_losses)
+  ax.plot(moving_average(critic_losses, 10))
   plt.show()
   plt.close()
 
