@@ -1,5 +1,4 @@
 import numpy as np
-import torch
 
 
 def moving_average(x, w):
@@ -20,10 +19,8 @@ def rollout(env, policy_net, value_net, horizon, nstates, max_ep_length):
   ep_length = 0
 
   for t in range(horizon):
-    with torch.no_grad():
-      state_tensor = torch.as_tensor(state, dtype=torch.float32)
-      state_value = value_net(state_tensor)
-      action, log_prob = policy_net(state_tensor)
+    state_value = value_net(state)
+    action, log_prob = policy_net(state)
 
     next_state, reward, done, _ = env.step(action)
 
@@ -47,8 +44,7 @@ def rollout(env, policy_net, value_net, horizon, nstates, max_ep_length):
   # compute state value estimate and reward for very last state
   # state value is 0 if it ended in a terminal state (done==true)
   # bootstrap the initial discounted reward to this state value
-  state_tensor = torch.as_tensor(state, dtype=torch.float32)
-  state_values[horizon] = value_net(state_tensor) if not done else 0
+  state_values[horizon] = value_net(state) if not done else 0
 
   return states, actions, rewards, dones, state_values, log_probs, ep_rewards
 
@@ -70,17 +66,4 @@ def get_advantages_and_returns(dones, rewards, values, discount, lam, horizon):
   advantages = (advantages - advantages.mean()) / advantages.std()
 
   return advantages, returns
-
-
-def compute_actor_loss(actor, state, action, log_prob, advantage, clip_epsilon):
-  _, current_log_probs = actor(state, action)
-  ratios = torch.exp(current_log_probs - log_prob)
-  clipped_ratios = torch.clamp(ratios, 1-clip_epsilon, 1+clip_epsilon)
-  unclipped_surrogate = ratios * advantage
-  clipped_surrogate = clipped_ratios * advantage
-  return -(torch.min(unclipped_surrogate, clipped_surrogate)).mean()
-
-
-def compute_critic_loss(critic, state, G):
-  return ((critic(state) - G)**2).mean()
 

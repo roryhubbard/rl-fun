@@ -3,6 +3,7 @@ import gym
 import numpy as np
 import matplotlib.pyplot as plt
 from models import Actor, Critic
+from core import get_advantages_and_returns, rollout, moving_average
 
 
 def main():
@@ -25,65 +26,36 @@ def main():
   critic = Critic(nstates)
 
   n_updates = total_timesteps // T
-  n_batches_per_update = T // batch_size + 1
+  if total_timesteps % T != 0:
+    n_updates += 1
+
+  n_batches_per_update = T // batch_size
   if T % batch_size != 0:
     n_batches_per_update += 1
 
+  episode_rewards = []
+  critic_losses = []
+
   for update in tqdm(range(n_updates)):
-    states = np.empty((T, nstates))
-    actions = np.empty(T)
-    rewards = np.empty(T)
-    returns = np.empty(T) # discounted rewards
-    dones = np.empty(T)
-    state_values = np.empty(T+1)
-    log_probs = np.empty(T)
-    advantages = np.empty(T)
+    states, actions, rewards, dones, values, log_probs, ep_rewards = rollout(
+      env, actor, critic, T, nstates, max_ep_length)
 
-    state = env.reset()
+    episode_rewards += ep_rewards
 
-    for t in range(T):
-      state_value = critic.forward(state)
-      action, log_prob = actor.forward(state)
-      next_state, reward, done, _ = env.step(action)
-
-      states[t] = state
-      actions[t] = action
-      rewards[t] = reward
-      dones[t] = done
-      state_values[t] = state_value
-      log_probs[t] = log_prob
-
-      state = env.reset() if done else next_state
-
-    # compute state value estimate and reward for very last state
-    # state value is 0 if it ended in a terminal state (done==true)
-    # bootstrap the initial discounted reward to this state value
-    state_values[T] = critic.forward(state) if not done else 0
-    discounted_reward = state_values[T]
-
-    next_non_terminal = 1 - dones
-    deltas = rewards + next_non_terminal * discount * state_values[1:] - state_values[:-1]
-    gae = 0
-    for i in reversed(range(T)):
-      gae = deltas[i] + next_non_terminal[i] * discount * lam * gae
-      advantages[i] = gae
-      discounted_reward = rewards[i] + next_non_terminal[i] * discount * discounted_reward
-      returns[i] = discounted_reward
+    advantages, returns = get_advantages_and_returns(dones, rewards, values, discount, lam, T)
 
     idx = np.arange(T)
-    actor_losses = []
-    critic_losses = []
+
     for k in range(epochs):
       np.random.default_rng().shuffle(idx)
 
       for n in range(0, n_batches_per_update, batch_size):
         batch_idx = idx[n:n+batch_size]
-        batch_states = states[batch_idx]
-        batch_actions = actions[batch_idx]
-        batch_returns = returns[batch_idx]
-        batch_state_values = state_values[batch_idx]
-        batch_A = advantages[batch_idx]
-        batch_log_probs = log_probs[batch_idx]
+        state = states[batch_idx]
+        action = actions[batch_idx]
+        log_prob = log_probs[batch_idx]
+        advantage = advantages[batch_idx]
+        G = returns[batch_idx]
 
         _, current_log_probs = actor.forward(batch_states,
                                              batch_actions, requires_grad=True)
@@ -96,7 +68,7 @@ def main():
         actor_loss = -np.minimum(unclipped_surrogate, clipped_surrogate).mean()
 
         current_state_values = critic.forward(batch_states, requires_grad=True)
-        critic_loss = 1/2 * ((current_state_values - batch_returns)**2).mean()
+        critic_loss = ((current_state_values - batch_returns)**2).mean()
 
         # derivative of actor_loss w.r.t current_log_probs
         dAL_dlp = -unclipped_surrogate
@@ -120,13 +92,17 @@ def main():
         actor_losses.append(actor_loss)
         critic_losses.append(critic_loss)
 
+  env.close()
+
   fig, ax = plt.subplots()
-  ax.plot(actor_losses)
-  ax.plot(critic_losses)
+  ax.plot(moving_average(episode_rewards, 100))
   plt.show()
   plt.close()
 
-  env.close()
+  fig, ax = plt.subplots()
+  ax.plot(moving_average(critic_losses, 10))
+  plt.show()
+  plt.close()
 
 
 if __name__ == "__main__":
