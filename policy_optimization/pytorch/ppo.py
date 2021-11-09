@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from torch.optim import Adam
-from models_pytorch import Actor, Critic
+from models import Actor, Critic
 from core import compute_critic_loss, compute_actor_loss, \
   get_advantages_and_returns, rollout, moving_average
 
